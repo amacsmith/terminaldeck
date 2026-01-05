@@ -33,6 +33,12 @@ pub struct AppPreferences {
     /// User's preferred language (e.g., "en", "es", "de")
     /// If None, uses system locale detection
     pub language: Option<String>,
+    /// Terminal app preference (e.g., "terminal", "iterm", "warp")
+    #[serde(default)]
+    pub terminal_app: Option<String>,
+    /// CLI tool preference (e.g., "claude", "codex")
+    #[serde(default)]
+    pub cli_tool: Option<String>,
 }
 
 impl Default for AppPreferences {
@@ -41,6 +47,8 @@ impl Default for AppPreferences {
             theme: "system".to_string(),
             quick_pane_shortcut: None, // None means use default
             language: None,            // None means use system locale
+            terminal_app: None,        // None means use "terminal"
+            cli_tool: None,            // None means use "claude"
         }
     }
 }

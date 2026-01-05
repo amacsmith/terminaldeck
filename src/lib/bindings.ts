@@ -142,6 +142,107 @@ async updateQuickPaneShortcut(shortcut: string | null) : Promise<Result<null, st
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+/**
+ * Check Stream Deck connection status
+ */
+async deckStatus() : Promise<DeckStatus> {
+    return await TAURI_INVOKE("deck_status");
+},
+/**
+ * Connect to Stream Deck
+ */
+async deckConnect() : Promise<Result<boolean, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("deck_connect") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Disconnect from Stream Deck
+ */
+async deckDisconnect() : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("deck_disconnect") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Reconnect to Stream Deck (useful after unplug/replug)
+ */
+async deckReconnect() : Promise<Result<boolean, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("deck_reconnect") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Execute a button action
+ */
+async deckExecuteAction(action: string, settings: DeckSettings) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("deck_execute_action", { action, settings }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Get the button configuration
+ */
+async deckGetButtons() : Promise<ButtonConfig[]> {
+    return await TAURI_INVOKE("deck_get_buttons");
+},
+/**
+ * Get button configuration with custom settings
+ */
+async deckGetButtonsWithSettings(settings: DeckSettings) : Promise<ButtonConfig[]> {
+    return await TAURI_INVOKE("deck_get_buttons_with_settings", { settings });
+},
+/**
+ * Update Stream Deck button images
+ */
+async deckUpdateButtons() : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("deck_update_buttons") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Update Stream Deck button images with custom settings
+ */
+async deckUpdateButtonsWithSettings(settings: DeckSettings) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("deck_update_buttons_with_settings", { settings }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Set action settings for button monitoring (without updating button images)
+ */
+async deckSetActionSettings(settings: DeckSettings) : Promise<void> {
+    await TAURI_INVOKE("deck_set_action_settings", { settings });
+},
+/**
+ * Debug: Save a test button image to disk
+ */
+async deckDebugSaveImage() : Promise<Result<string, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("deck_debug_save_image") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 }
 }
 
@@ -169,7 +270,18 @@ quick_pane_shortcut: string | null;
  * User's preferred language (e.g., "en", "es", "de")
  * If None, uses system locale detection
  */
-language: string | null }
+language: string | null; 
+/**
+ * Terminal app preference (e.g., "terminal", "iterm", "warp")
+ */
+terminal_app?: string | null; 
+/**
+ * CLI tool preference (e.g., "claude", "codex")
+ */
+cli_tool?: string | null }
+export type ButtonConfig = { id: number; label: string; sublabel: string | null; color: string; action: string }
+export type DeckSettings = { terminal_app: string; cli_tool: string }
+export type DeckStatus = { connected: boolean; buttons: ButtonConfig[] }
 export type JsonValue = null | boolean | number | string | JsonValue[] | Partial<{ [key in string]: JsonValue }>
 /**
  * Error types for recovery operations (typed for frontend matching)

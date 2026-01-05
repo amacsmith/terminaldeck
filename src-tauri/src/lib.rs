@@ -6,10 +6,13 @@
 
 mod bindings;
 mod commands;
+mod streamdeck;
 mod types;
 mod utils;
 
 use tauri::Manager;
+use tauri::menu::{Menu, MenuItem};
+use tauri::tray::TrayIconBuilder;
 
 // Re-export only what's needed externally
 pub use types::DEFAULT_QUICK_PANE_SHORTCUT;
@@ -86,6 +89,15 @@ pub fn run() {
         app_builder = app_builder.plugin(tauri_nspanel::init());
     }
 
+    // Autostart plugin for launch on login
+    #[cfg(desktop)]
+    {
+        app_builder = app_builder.plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            None,
+        ));
+    }
+
     app_builder
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_persisted_scope::init())
@@ -93,6 +105,9 @@ pub fn run() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_os::init())
+        .manage(commands::streamdeck::DeckState(std::sync::Mutex::new(
+            streamdeck::StreamDeckManager::new(),
+        )))
         .setup(|app| {
             log::info!("Application starting up");
             log::debug!(
@@ -127,6 +142,81 @@ pub fn run() {
             if let Err(e) = commands::quick_pane::init_quick_pane(app.handle()) {
                 log::error!("Failed to create quick pane: {e}");
                 // Non-fatal: app can still run without quick pane
+            }
+
+            // Try to connect to Stream Deck on startup and update button images
+            if let Some(deck_state) = app.try_state::<commands::streamdeck::DeckState>() {
+                if let Ok(manager) = deck_state.0.lock() {
+                    if manager.connect().is_ok() {
+                        log::info!("Stream Deck connected on startup");
+
+                        // Set brightness and update button images
+                        if let Ok(deck_guard) = manager.get_deck().lock() {
+                            let _ = deck_guard.set_brightness(80);
+                        }
+
+                        let buttons = streamdeck::get_default_buttons();
+                        if let Err(e) = manager.update_buttons(&buttons) {
+                            log::error!("Failed to update Stream Deck buttons: {e}");
+                        } else {
+                            log::info!("Stream Deck buttons updated with text");
+                        }
+                    } else {
+                        log::info!("No Stream Deck found on startup (will retry on demand)");
+                    }
+                }
+            }
+
+            // Set up tray icon
+            #[cfg(desktop)]
+            {
+                let show_item = MenuItem::with_id(app, "show", "Show TerminalDeck", true, None::<&str>)?;
+                let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+                let menu = Menu::with_items(app, &[&show_item, &quit_item])?;
+
+                let _tray = TrayIconBuilder::new()
+                    .icon(app.default_window_icon().unwrap().clone())
+                    .menu(&menu)
+                    .tooltip("TerminalDeck")
+                    .on_menu_event(|app, event| match event.id.as_ref() {
+                        "show" => {
+                            if let Some(window) = app.get_webview_window("main") {
+                                let _ = window.show();
+                                let _ = window.set_focus();
+                            }
+                        }
+                        "quit" => {
+                            // Properly clean up before exiting
+                            #[cfg(target_os = "macos")]
+                            {
+                                use tauri_nspanel::ManagerExt;
+                                // Destroy the quick pane panel before exiting to avoid crash
+                                if let Ok(panel) = app.get_webview_panel("quick-pane") {
+                                    panel.hide();
+                                    // Close the underlying window
+                                    if let Some(window) = app.get_webview_window("quick-pane") {
+                                        let _ = window.destroy();
+                                    }
+                                }
+                            }
+                            app.exit(0);
+                        }
+                        _ => {}
+                    })
+                    .on_tray_icon_event(|tray, event| {
+                        if let tauri::tray::TrayIconEvent::Click { button, .. } = event {
+                            if button == tauri::tray::MouseButton::Left {
+                                let app = tray.app_handle();
+                                if let Some(window) = app.get_webview_window("main") {
+                                    let _ = window.show();
+                                    let _ = window.set_focus();
+                                }
+                            }
+                        }
+                    })
+                    .build(app)?;
+
+                log::info!("Tray icon created");
             }
 
             // NOTE: Application menu is built from JavaScript for i18n support

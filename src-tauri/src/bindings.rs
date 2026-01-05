@@ -1,7 +1,7 @@
 use tauri_specta::{collect_commands, Builder};
 
 pub fn generate_bindings() -> Builder<tauri::Wry> {
-    use crate::commands::{notifications, preferences, quick_pane, recovery};
+    use crate::commands::{notifications, preferences, quick_pane, recovery, streamdeck};
 
     Builder::<tauri::Wry>::new().commands(collect_commands![
         preferences::greet,
@@ -16,6 +16,17 @@ pub fn generate_bindings() -> Builder<tauri::Wry> {
         quick_pane::toggle_quick_pane,
         quick_pane::get_default_quick_pane_shortcut,
         quick_pane::update_quick_pane_shortcut,
+        streamdeck::deck_status,
+        streamdeck::deck_connect,
+        streamdeck::deck_disconnect,
+        streamdeck::deck_reconnect,
+        streamdeck::deck_execute_action,
+        streamdeck::deck_get_buttons,
+        streamdeck::deck_get_buttons_with_settings,
+        streamdeck::deck_update_buttons,
+        streamdeck::deck_update_buttons_with_settings,
+        streamdeck::deck_set_action_settings,
+        streamdeck::deck_debug_save_image,
     ])
 }
 
