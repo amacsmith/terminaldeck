@@ -240,19 +240,13 @@ fn close_session() -> Result<(), String> {
 
 /// Toggle macOS dictation
 fn toggle_dictation() -> Result<(), String> {
-    // Try to click "Start Dictation" in the Edit menu
+    // Press Fn key twice to trigger dictation
+    // Requires: System Settings → Keyboard → Dictation → Shortcut: "Press Fn Key Twice"
     let script = r#"
         tell application "System Events"
-            tell (first process whose frontmost is true)
-                try
-                    click menu item "Start Dictation" of menu "Edit" of menu bar 1
-                on error
-                    -- Fallback: press Fn twice (key code 63)
-                    key code 63
-                    delay 0.1
-                    key code 63
-                end try
-            end tell
+            key code 63
+            delay 0.15
+            key code 63
         end tell
     "#;
     run_applescript(script)?;
