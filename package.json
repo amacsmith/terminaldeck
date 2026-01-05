@@ -1,10 +1,11 @@
 {
-  "name": "tauri-app",
+  "name": "terminaldeck",
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "author": "Danny Smith",
-  "copyright": "Copyright © 2025 Danny Smith. All rights reserved.",
+  "author": "Sid Mohan",
+  "description": "Control Claude Code with Stream Deck + voice dictation",
+  "copyright": "Copyright © 2025 Sid Mohan. All rights reserved.",
   "license": "MIT",
   "engines": {
     "node": ">=20.0.0"

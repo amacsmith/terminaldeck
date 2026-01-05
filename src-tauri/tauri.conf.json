@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "tauri-app",
+  "productName": "TerminalDeck",
   "version": "0.1.0",
-  "identifier": "com.tauri-app.app",
+  "identifier": "com.terminaldeck.app",
   "build": {
     "removeUnusedCommands": true,
     "beforeDevCommand": "npm run dev",
@@ -13,16 +13,20 @@
   "app": {
     "windows": [
       {
-        "title": "tauri-app",
-        "width": 1000,
-        "height": 700,
-        "minWidth": 1000,
-        "minHeight": 700,
+        "title": "TerminalDeck",
+        "width": 780,
+        "height": 560,
+        "minWidth": 780,
+        "minHeight": 560,
+        "maxWidth": 900,
+        "maxHeight": 700,
         "resizable": true,
         "fullscreen": false,
         "maximized": false,
         "center": true,
-        "decorations": true,
+        "decorations": false,
+        "hiddenTitle": true,
+        "titleBarStyle": "overlay",
         "alwaysOnTop": false,
         "transparent": false,
         "shadow": true,
@@ -45,11 +49,11 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "publisher": "Your Name",
+    "publisher": "Sid Mohan",
     "category": "DeveloperTool",
-    "shortDescription": "A Tauri React template application",
-    "longDescription": "A modern Tauri React template with comprehensive boilerplate code, TypeScript, Tailwind CSS, and shadcn/ui components.",
-    "copyright": "Copyright © 2025 Your Name. All rights reserved.",
+    "shortDescription": "Control Claude Code with Stream Deck + voice",
+    "longDescription": "TerminalDeck lets you control Claude Code entirely through a Stream Deck and voice dictation. Designed for accessibility and hands-free coding.",
+    "copyright": "Copyright © 2025 Sid Mohan. All rights reserved.",
     "macOS": {
       "frameworks": [],
       "minimumSystemVersion": "10.15",
@@ -63,7 +67,7 @@
     "updater": {
       "active": true,
       "endpoints": [
-        "https://github.com/YOUR_USERNAME/YOUR_REPO/releases/latest/download/latest.json"
+        "https://github.com/sidmohan0/terminaldeck/releases/latest/download/latest.json"
       ],
       "dialog": true,
       "pubkey": "YOUR_UPDATER_PUBLIC_KEY_HERE"
