@@ -35,7 +35,7 @@ const defaultSettings: DeckSettings = {
   customTerminalApp: '',
   cliTool: 'claude',
   customCliTool: '',
-  dictationShortcut: 'fn_twice',
+  dictationShortcut: 'ctrl_twice',
   customDictationShortcut: '',
   launchOnStartup: false,
 }
@@ -60,7 +60,7 @@ function parseCliTool(saved: string | null | undefined): DeckSettings['cliTool']
 }
 
 function parseDictationShortcut(saved: string | null | undefined): DeckSettings['dictationShortcut'] {
-  if (!saved) return 'fn_twice'
+  if (!saved) return 'ctrl_twice'
   const lower = saved.toLowerCase()
   if (lower === 'fn_twice' || lower === 'fn_hold' || lower === 'ctrl_twice') {
     return lower as DeckSettings['dictationShortcut']
@@ -83,7 +83,7 @@ function toTauriSettings(settings: DeckSettings): TauriDeckSettings {
   return {
     terminal_app: terminalApp || 'Terminal',
     cli_tool: cliTool || 'claude',
-    dictation_shortcut: dictationShortcut || 'fn_twice',
+    dictation_shortcut: dictationShortcut || 'ctrl_twice',
   }
 }
 

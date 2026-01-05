@@ -11,7 +11,7 @@
 
 Do not report security vulnerabilities through public GitHub issues.
 
-**Contact**: YOUR_SECURITY_EMAIL
+**Report via**: [GitHub Security Advisories](https://github.com/sidmohan0/terminaldeck/security/advisories/new)
 
 Include:
 

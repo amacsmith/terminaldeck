@@ -84,37 +84,37 @@
   --sidebar-ring: oklch(0.708 0 0);
 }
 
-/* Bloomberg Terminal Theme */
+/* Slate Dark Theme - Low saturation for power users */
 .dark {
-  --background: #000000;
-  --foreground: #FFA028;
-  --card: #0a0a0a;
-  --card-foreground: #FFA028;
-  --popover: #0a0a0a;
-  --popover-foreground: #FFA028;
-  --primary: #FFA028;
-  --primary-foreground: #000000;
-  --secondary: #1a1a1a;
-  --secondary-foreground: #FFA028;
-  --muted: #1a1a1a;
-  --muted-foreground: #cc8020;
-  --accent: #4af6c3;
-  --accent-foreground: #000000;
-  --destructive: #ff433d;
-  --border: #333333;
-  --input: #1a1a1a;
-  --ring: #FFA028;
-  --chart-1: #FFA028;
-  --chart-2: #4af6c3;
-  --chart-3: #0068ff;
-  --chart-4: #ff433d;
-  --chart-5: #cc8020;
-  --sidebar: #0a0a0a;
-  --sidebar-foreground: #FFA028;
-  --sidebar-primary: #FFA028;
-  --sidebar-primary-foreground: #000000;
-  --sidebar-accent: #1a1a1a;
-  --sidebar-accent-foreground: #FFA028;
-  --sidebar-border: #333333;
-  --sidebar-ring: #FFA028;
+  --background: #0f1419;
+  --foreground: #e6edf3;
+  --card: #161b22;
+  --card-foreground: #e6edf3;
+  --popover: #161b22;
+  --popover-foreground: #e6edf3;
+  --primary: #58a6ff;
+  --primary-foreground: #0f1419;
+  --secondary: #21262d;
+  --secondary-foreground: #c9d1d9;
+  --muted: #21262d;
+  --muted-foreground: #8b949e;
+  --accent: #238636;
+  --accent-foreground: #e6edf3;
+  --destructive: #f85149;
+  --border: #30363d;
+  --input: #21262d;
+  --ring: #58a6ff;
+  --chart-1: #58a6ff;
+  --chart-2: #3fb950;
+  --chart-3: #a371f7;
+  --chart-4: #f78166;
+  --chart-5: #8b949e;
+  --sidebar: #0d1117;
+  --sidebar-foreground: #c9d1d9;
+  --sidebar-primary: #58a6ff;
+  --sidebar-primary-foreground: #0f1419;
+  --sidebar-accent: #21262d;
+  --sidebar-accent-foreground: #c9d1d9;
+  --sidebar-border: #30363d;
+  --sidebar-ring: #58a6ff;
 }

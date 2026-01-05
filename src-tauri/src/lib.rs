@@ -167,12 +167,25 @@ pub fn run() {
                 }
             }
 
-            // Set up tray icon
+            // Set up tray icon with Stream Deck controls
             #[cfg(desktop)]
             {
+                use tauri::menu::PredefinedMenuItem;
+
                 let show_item = MenuItem::with_id(app, "show", "Show TerminalDeck", true, None::<&str>)?;
+                let separator1 = PredefinedMenuItem::separator(app)?;
+                let connect_item = MenuItem::with_id(app, "connect", "Connect Stream Deck", true, None::<&str>)?;
+                let disconnect_item = MenuItem::with_id(app, "disconnect", "Disconnect Stream Deck", true, None::<&str>)?;
+                let separator2 = PredefinedMenuItem::separator(app)?;
                 let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-                let menu = Menu::with_items(app, &[&show_item, &quit_item])?;
+                let menu = Menu::with_items(app, &[
+                    &show_item,
+                    &separator1,
+                    &connect_item,
+                    &disconnect_item,
+                    &separator2,
+                    &quit_item,
+                ])?;
 
                 let _tray = TrayIconBuilder::new()
                     .icon(app.default_window_icon().unwrap().clone())
@@ -183,6 +196,31 @@ pub fn run() {
                             if let Some(window) = app.get_webview_window("main") {
                                 let _ = window.show();
                                 let _ = window.set_focus();
+                            }
+                        }
+                        "connect" => {
+                            if let Some(deck_state) = app.try_state::<commands::streamdeck::DeckState>() {
+                                if let Ok(manager) = deck_state.0.lock() {
+                                    if manager.connect().is_ok() {
+                                        log::info!("Stream Deck connected via tray menu");
+                                        if let Ok(deck_guard) = manager.get_deck().lock() {
+                                            let _ = deck_guard.set_brightness(80);
+                                        }
+                                        let buttons = streamdeck::get_default_buttons();
+                                        let _ = manager.update_buttons(&buttons);
+                                    }
+                                }
+                            }
+                        }
+                        "disconnect" => {
+                            if let Some(deck_state) = app.try_state::<commands::streamdeck::DeckState>() {
+                                if let Ok(manager) = deck_state.0.lock() {
+                                    if let Ok(deck_guard) = manager.get_deck().lock() {
+                                        let _ = deck_guard.reset();
+                                    }
+                                    manager.disconnect();
+                                    log::info!("Stream Deck disconnected via tray menu");
+                                }
                             }
                         }
                         "quit" => {
@@ -197,6 +235,15 @@ pub fn run() {
                                     if let Some(window) = app.get_webview_window("quick-pane") {
                                         let _ = window.destroy();
                                     }
+                                }
+                            }
+                            // Disconnect Stream Deck before quitting
+                            if let Some(deck_state) = app.try_state::<commands::streamdeck::DeckState>() {
+                                if let Ok(manager) = deck_state.0.lock() {
+                                    if let Ok(deck_guard) = manager.get_deck().lock() {
+                                        let _ = deck_guard.reset();
+                                    }
+                                    manager.disconnect();
                                 }
                             }
                             app.exit(0);

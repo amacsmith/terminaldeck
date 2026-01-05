@@ -83,10 +83,7 @@ pub fn execute_action(action: &str, settings: &ActionSettings) -> Result<(), Str
         "submit" => send_keycode(36, None), // Enter
         "up" => send_keycode(126, None),    // Up arrow
         "down" => send_keycode(125, None),  // Down arrow
-        "compact" => {
-            send_keystroke("/compact", None)?;
-            send_keycode(36, None) // Enter
-        }
+        "delete" => send_keycode(51, None), // Delete/Backspace
 
         _ => {
             error!("Unknown action: {}", action);
@@ -243,7 +240,7 @@ fn close_session() -> Result<(), String> {
 /// Toggle dictation using the configured shortcut
 fn toggle_dictation(shortcut: &str) -> Result<(), String> {
     let script = match shortcut {
-        // Press Fn key twice (default macOS Dictation)
+        // Press Fn/Globe key twice (default macOS Dictation on older Macs)
         "fn_twice" => r#"
             tell application "System Events"
                 key code 63
@@ -252,21 +249,25 @@ fn toggle_dictation(shortcut: &str) -> Result<(), String> {
             end tell
         "#.to_string(),
 
-        // Hold Fn key (for Wispr Flow style - press down, brief hold, release)
+        // Hold Fn/Globe key (for Wispr Flow or newer macOS)
         "fn_hold" => r#"
             tell application "System Events"
                 key down 63
-                delay 0.3
+                delay 0.5
                 key up 63
             end tell
         "#.to_string(),
 
-        // Press Control key twice
+        // Press Control key twice (with explicit up/down for reliability)
         "ctrl_twice" => r#"
             tell application "System Events"
-                key code 59
-                delay 0.15
-                key code 59
+                key down 59
+                delay 0.05
+                key up 59
+                delay 0.3
+                key down 59
+                delay 0.05
+                key up 59
             end tell
         "#.to_string(),
 
@@ -275,12 +276,12 @@ fn toggle_dictation(shortcut: &str) -> Result<(), String> {
             if let Some(script) = parse_custom_shortcut(custom) {
                 script
             } else {
-                // Fall back to fn_twice if parsing fails
+                // Fall back to ctrl_twice if parsing fails
                 r#"
                     tell application "System Events"
-                        key code 63
-                        delay 0.15
-                        key code 63
+                        key code 59
+                        delay 0.2
+                        key code 59
                     end tell
                 "#.to_string()
             }

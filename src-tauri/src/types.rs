@@ -52,7 +52,7 @@ impl Default for AppPreferences {
             language: None,             // None means use system locale
             terminal_app: None,         // None means use "terminal"
             cli_tool: None,             // None means use "claude"
-            dictation_shortcut: None,   // None means use "fn_twice"
+            dictation_shortcut: None,   // None means use "ctrl_twice"
         }
     }
 }

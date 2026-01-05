@@ -65,25 +65,26 @@ pub fn get_buttons_with_settings(terminal_app: &str, cli_tool: &str) -> Vec<Butt
 
     vec![
         // Row 1: Session Management
-        ButtonConfig { id: 0, label: "Open".into(), sublabel: Some(terminal_name.clone()), color: "#2563eb".into(), action: "openTerminal".into() },
-        ButtonConfig { id: 1, label: "Switch".into(), sublabel: Some("Window".into()), color: "#475569".into(), action: "switchWindow".into() },
-        ButtonConfig { id: 2, label: "Launch".into(), sublabel: Some(cli_name), color: "#2563eb".into(), action: "launchClaude".into() },
-        ButtonConfig { id: 3, label: "New".into(), sublabel: Some(terminal_name), color: "#2563eb".into(), action: "newTerminal".into() },
-        ButtonConfig { id: 4, label: "Close".into(), sublabel: Some("Session".into()), color: "#dc2626".into(), action: "closeSession".into() },
+        // Muted color palette for power users
+        ButtonConfig { id: 0, label: "Open".into(), sublabel: Some(terminal_name.clone()), color: "#3d5a80".into(), action: "openTerminal".into() },
+        ButtonConfig { id: 1, label: "Switch".into(), sublabel: Some("Window".into()), color: "#2d3748".into(), action: "switchWindow".into() },
+        ButtonConfig { id: 2, label: "Launch".into(), sublabel: Some(cli_name), color: "#3d5a80".into(), action: "launchClaude".into() },
+        ButtonConfig { id: 3, label: "New".into(), sublabel: Some(terminal_name), color: "#3d5a80".into(), action: "newTerminal".into() },
+        ButtonConfig { id: 4, label: "Close".into(), sublabel: Some("Session".into()), color: "#8b3a3a".into(), action: "closeSession".into() },
 
         // Row 2: Responses
-        ButtonConfig { id: 5, label: "Yes".into(), sublabel: Some("[Y]".into()), color: "#059669".into(), action: "yes".into() },
-        ButtonConfig { id: 6, label: "Yes to".into(), sublabel: Some("All".into()), color: "#059669".into(), action: "yesToAll".into() },
-        ButtonConfig { id: 7, label: "No".into(), sublabel: Some("[N]".into()), color: "#dc2626".into(), action: "no".into() },
-        ButtonConfig { id: 8, label: "Cancel".into(), sublabel: Some("ESC".into()), color: "#dc2626".into(), action: "cancel".into() },
-        ButtonConfig { id: 9, label: "Tab".into(), sublabel: Some("->|".into()), color: "#475569".into(), action: "tab".into() },
+        ButtonConfig { id: 5, label: "Yes".into(), sublabel: Some("[Y]".into()), color: "#3d6b59".into(), action: "yes".into() },
+        ButtonConfig { id: 6, label: "Yes to".into(), sublabel: Some("All".into()), color: "#3d6b59".into(), action: "yesToAll".into() },
+        ButtonConfig { id: 7, label: "No".into(), sublabel: Some("[N]".into()), color: "#8b3a3a".into(), action: "no".into() },
+        ButtonConfig { id: 8, label: "Cancel".into(), sublabel: Some("ESC".into()), color: "#8b3a3a".into(), action: "cancel".into() },
+        ButtonConfig { id: 9, label: "Tab".into(), sublabel: Some("->|".into()), color: "#2d3748".into(), action: "tab".into() },
 
         // Row 3: Primary Actions
-        ButtonConfig { id: 10, label: "Dictate".into(), sublabel: Some("MIC".into()), color: "#7c3aed".into(), action: "dictate".into() },
-        ButtonConfig { id: 11, label: "Submit".into(), sublabel: Some("ENTER".into()), color: "#059669".into(), action: "submit".into() },
-        ButtonConfig { id: 12, label: "UP".into(), sublabel: None, color: "#475569".into(), action: "up".into() },
-        ButtonConfig { id: 13, label: "DOWN".into(), sublabel: None, color: "#475569".into(), action: "down".into() },
-        ButtonConfig { id: 14, label: "/compact".into(), sublabel: None, color: "#0891b2".into(), action: "compact".into() },
+        ButtonConfig { id: 10, label: "Dictate".into(), sublabel: Some("MIC".into()), color: "#5a4a78".into(), action: "dictate".into() },
+        ButtonConfig { id: 11, label: "Submit".into(), sublabel: Some("ENTER".into()), color: "#3d6b59".into(), action: "submit".into() },
+        ButtonConfig { id: 12, label: "UP".into(), sublabel: None, color: "#2d3748".into(), action: "up".into() },
+        ButtonConfig { id: 13, label: "DOWN".into(), sublabel: None, color: "#2d3748".into(), action: "down".into() },
+        ButtonConfig { id: 14, label: "Delete".into(), sublabel: Some("DEL".into()), color: "#2d3748".into(), action: "delete".into() },
     ]
 }
 
@@ -283,13 +284,15 @@ impl StreamDeck {
 
         match device.read_timeout(&mut buf, timeout_ms) {
             Ok(size) if size > 0 => {
-                // MK.2 button state format: [0x01, key1, key2, ..., key15]
-                if buf[0] == 0x01 && size >= 16 {
+                // MK.2 button state format: [0x01, 0x00, 0x0F, 0x00, key1, key2, ..., key15]
+                // Bytes 0-3 are header, button states start at byte 4
+                if buf[0] == 0x01 && size >= 19 {
                     let states: Vec<bool> = (0..NUM_KEYS)
-                        .map(|i| buf[i + 1] == 1)
+                        .map(|i| buf[i + 4] == 1)
                         .collect();
                     Ok(Some(states))
                 } else {
+                    log::trace!("Unexpected HID data: header={:#x}, size={}", buf[0], size);
                     Ok(None)
                 }
             }

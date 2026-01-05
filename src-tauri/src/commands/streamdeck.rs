@@ -26,7 +26,7 @@ fn get_action_settings() -> ActionSettings {
     ActionSettings {
         terminal_app: if terminal.is_empty() { "Terminal".to_string() } else { terminal.clone() },
         cli_tool: if cli.is_empty() { "claude".to_string() } else { cli.clone() },
-        dictation_shortcut: if dictation.is_empty() { "fn_twice".to_string() } else { dictation.clone() },
+        dictation_shortcut: if dictation.is_empty() { "ctrl_twice".to_string() } else { dictation.clone() },
     }
 }
 
@@ -57,7 +57,7 @@ impl Default for DeckSettings {
         DeckSettings {
             terminal_app: "Terminal".to_string(),
             cli_tool: "claude".to_string(),
-            dictation_shortcut: "fn_twice".to_string(),
+            dictation_shortcut: "ctrl_twice".to_string(),
         }
     }
 }
@@ -134,30 +134,63 @@ pub async fn deck_connect(state: State<'_, DeckState>) -> Result<bool, String> {
 
         thread::spawn(move || {
             let mut last_states = vec![false; 15];
+            let mut hold_start: [Option<std::time::Instant>; 15] = Default::default();
+            let mut last_repeat: [Option<std::time::Instant>; 15] = Default::default();
+
+            // Hold-to-repeat settings
+            let initial_delay = Duration::from_millis(400); // Delay before repeat starts
+            let repeat_interval = Duration::from_millis(50); // Interval between repeats
 
             while MONITORING_ACTIVE.load(Ordering::SeqCst) {
                 if let Ok(deck) = deck_for_monitor.lock() {
                     if deck.is_connected() {
                         if let Ok(Some(states)) = deck.read_keys(100) {
                             for (i, (&current, &last)) in states.iter().zip(last_states.iter()).enumerate() {
-                                if current && !last {
-                                    // Stream Deck MK.2 button indices are offset by 3 (rotated globally)
-                                    // Device 3=Button 0, Device 4=Button 1, Device 5=Button 2, etc.
-                                    let mapped_id = (i + 12) % 15;
+                                // Device index maps directly to button ID (no offset)
+                                let button_id = i;
 
-                                    // Button pressed - get current settings
+                                if current && !last {
+                                    // Button just pressed - execute action immediately
                                     let action_settings = get_action_settings();
-                                    if let Some(button) = buttons_for_monitor.iter().find(|b| b.id as usize == mapped_id) {
-                                        debug!("Button {} (mapped from {}) ({}) pressed", mapped_id, i, button.label);
+                                    if let Some(button) = buttons_for_monitor.iter().find(|b| b.id as usize == button_id) {
+                                        debug!("Button {} ({}) pressed", button_id, button.label);
                                         let _ = execute_action(&button.action, &action_settings);
                                     }
+                                    // Start hold timer
+                                    hold_start[i] = Some(std::time::Instant::now());
+                                    last_repeat[i] = None;
+                                } else if current && last {
+                                    // Button being held - check for repeat (delete button only)
+                                    if let Some(button) = buttons_for_monitor.iter().find(|b| b.id as usize == button_id) {
+                                        if button.action == "delete" {
+                                            if let Some(start) = hold_start[i] {
+                                                let held_for = start.elapsed();
+                                                if held_for >= initial_delay {
+                                                    // Past initial delay, check repeat interval
+                                                    let should_repeat = match last_repeat[i] {
+                                                        None => true,
+                                                        Some(last) => last.elapsed() >= repeat_interval,
+                                                    };
+                                                    if should_repeat {
+                                                        let action_settings = get_action_settings();
+                                                        let _ = execute_action(&button.action, &action_settings);
+                                                        last_repeat[i] = Some(std::time::Instant::now());
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                } else if !current && last {
+                                    // Button released - reset hold timer
+                                    hold_start[i] = None;
+                                    last_repeat[i] = None;
                                 }
                             }
                             last_states = states;
                         }
                     }
                 }
-                thread::sleep(Duration::from_millis(50));
+                thread::sleep(Duration::from_millis(30)); // Faster polling for smoother repeat
             }
             debug!("Button monitoring stopped");
         });
