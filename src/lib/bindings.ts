@@ -278,9 +278,13 @@ terminal_app?: string | null;
 /**
  * CLI tool preference (e.g., "claude", "codex")
  */
-cli_tool?: string | null }
+cli_tool?: string | null; 
+/**
+ * Dictation shortcut (e.g., "fn_twice", "fn_hold", "ctrl_twice", or custom like "cmd+shift+d")
+ */
+dictation_shortcut?: string | null }
 export type ButtonConfig = { id: number; label: string; sublabel: string | null; color: string; action: string }
-export type DeckSettings = { terminal_app: string; cli_tool: string }
+export type DeckSettings = { terminal_app: string; cli_tool: string; dictation_shortcut: string }
 export type DeckStatus = { connected: boolean; buttons: ButtonConfig[] }
 export type JsonValue = null | boolean | number | string | JsonValue[] | Partial<{ [key in string]: JsonValue }>
 /**

@@ -86,6 +86,35 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
         )}
       </div>
 
+      {/* Dictation Shortcut */}
+      <div className="space-y-1">
+        <Label htmlFor="dictation-shortcut" className="text-xs">Dictation Shortcut</Label>
+        <Select
+          value={settings.dictationShortcut}
+          onValueChange={(value) =>
+            updateSettings({ dictationShortcut: value as typeof settings.dictationShortcut })
+          }
+        >
+          <SelectTrigger id="dictation-shortcut" className="h-8 text-xs">
+            <SelectValue placeholder="Select shortcut" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="fn_twice">Press Fn Twice (macOS)</SelectItem>
+            <SelectItem value="fn_hold">Hold Fn (Wispr Flow)</SelectItem>
+            <SelectItem value="ctrl_twice">Press Control Twice</SelectItem>
+            <SelectItem value="custom">Custom</SelectItem>
+          </SelectContent>
+        </Select>
+        {settings.dictationShortcut === 'custom' && (
+          <Input
+            placeholder="e.g., cmd+shift+d"
+            value={settings.customDictationShortcut}
+            onChange={(e) => updateSettings({ customDictationShortcut: e.target.value })}
+            className="h-8 text-xs"
+          />
+        )}
+      </div>
+
       {/* Launch on Startup */}
       <div className="flex items-center justify-between pt-2">
         <Label htmlFor="launch-startup" className="text-xs">Launch on Startup</Label>

@@ -79,7 +79,7 @@ pub fn execute_action(action: &str, settings: &ActionSettings) -> Result<(), Str
         "tab" => send_keycode(48, None),    // Tab
 
         // Primary Actions
-        "dictate" => toggle_dictation(),
+        "dictate" => toggle_dictation(&settings.dictation_shortcut),
         "submit" => send_keycode(36, None), // Enter
         "up" => send_keycode(126, None),    // Up arrow
         "down" => send_keycode(125, None),  // Down arrow
@@ -100,6 +100,7 @@ pub fn execute_action(action: &str, settings: &ActionSettings) -> Result<(), Str
 pub struct ActionSettings {
     pub terminal_app: String,
     pub cli_tool: String,
+    pub dictation_shortcut: String,
 }
 
 impl Default for ActionSettings {
@@ -107,6 +108,7 @@ impl Default for ActionSettings {
         ActionSettings {
             terminal_app: "Terminal".to_string(),
             cli_tool: "claude".to_string(),
+            dictation_shortcut: "fn_twice".to_string(),
         }
     }
 }
@@ -238,18 +240,89 @@ fn close_session() -> Result<(), String> {
     Ok(())
 }
 
-/// Toggle macOS dictation
-fn toggle_dictation() -> Result<(), String> {
-    // Press Fn key twice to trigger dictation
-    // Requires: System Settings → Keyboard → Dictation → Shortcut: "Press Fn Key Twice"
-    let script = r#"
-        tell application "System Events"
-            key code 63
-            delay 0.15
-            key code 63
-        end tell
-    "#;
-    run_applescript(script)?;
-    info!("Toggled dictation");
+/// Toggle dictation using the configured shortcut
+fn toggle_dictation(shortcut: &str) -> Result<(), String> {
+    let script = match shortcut {
+        // Press Fn key twice (default macOS Dictation)
+        "fn_twice" => r#"
+            tell application "System Events"
+                key code 63
+                delay 0.15
+                key code 63
+            end tell
+        "#.to_string(),
+
+        // Hold Fn key (for Wispr Flow style - press down, brief hold, release)
+        "fn_hold" => r#"
+            tell application "System Events"
+                key down 63
+                delay 0.3
+                key up 63
+            end tell
+        "#.to_string(),
+
+        // Press Control key twice
+        "ctrl_twice" => r#"
+            tell application "System Events"
+                key code 59
+                delay 0.15
+                key code 59
+            end tell
+        "#.to_string(),
+
+        // Custom shortcut - parse format like "cmd+shift+d"
+        custom => {
+            if let Some(script) = parse_custom_shortcut(custom) {
+                script
+            } else {
+                // Fall back to fn_twice if parsing fails
+                r#"
+                    tell application "System Events"
+                        key code 63
+                        delay 0.15
+                        key code 63
+                    end tell
+                "#.to_string()
+            }
+        }
+    };
+
+    run_applescript(&script)?;
+    info!("Toggled dictation with shortcut: {}", shortcut);
     Ok(())
+}
+
+/// Parse a custom shortcut string like "cmd+shift+d" into AppleScript
+fn parse_custom_shortcut(shortcut: &str) -> Option<String> {
+    // Parse format like "cmd+shift+d" into AppleScript
+    let parts: Vec<String> = shortcut.split('+').map(|s| s.trim().to_lowercase()).collect();
+
+    if parts.is_empty() {
+        return None;
+    }
+
+    let key = parts.last()?;
+    let modifiers: Vec<&str> = parts[..parts.len()-1].iter().map(|s| s.as_str()).collect();
+
+    let mut modifier_str = Vec::new();
+    for m in &modifiers {
+        match *m {
+            "cmd" | "command" => modifier_str.push("command down"),
+            "ctrl" | "control" => modifier_str.push("control down"),
+            "alt" | "option" => modifier_str.push("option down"),
+            "shift" => modifier_str.push("shift down"),
+            _ => {}
+        }
+    }
+
+    let modifiers_applescript = if modifier_str.is_empty() {
+        String::new()
+    } else {
+        format!(" using {{{}}}", modifier_str.join(", "))
+    };
+
+    Some(format!(
+        r#"tell application "System Events" to keystroke "{}"{}"#,
+        key, modifiers_applescript
+    ))
 }

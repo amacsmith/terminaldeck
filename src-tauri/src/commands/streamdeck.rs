@@ -17,19 +17,23 @@ static MONITORING_ACTIVE: AtomicBool = AtomicBool::new(false);
 // Global settings for button actions
 static TERMINAL_APP: std::sync::RwLock<String> = std::sync::RwLock::new(String::new());
 static CLI_TOOL: std::sync::RwLock<String> = std::sync::RwLock::new(String::new());
+static DICTATION_SHORTCUT: std::sync::RwLock<String> = std::sync::RwLock::new(String::new());
 
 fn get_action_settings() -> ActionSettings {
     let terminal = TERMINAL_APP.read().unwrap();
     let cli = CLI_TOOL.read().unwrap();
+    let dictation = DICTATION_SHORTCUT.read().unwrap();
     ActionSettings {
         terminal_app: if terminal.is_empty() { "Terminal".to_string() } else { terminal.clone() },
         cli_tool: if cli.is_empty() { "claude".to_string() } else { cli.clone() },
+        dictation_shortcut: if dictation.is_empty() { "fn_twice".to_string() } else { dictation.clone() },
     }
 }
 
-fn set_action_settings(terminal_app: &str, cli_tool: &str) {
+fn set_action_settings(terminal_app: &str, cli_tool: &str, dictation_shortcut: &str) {
     *TERMINAL_APP.write().unwrap() = terminal_app.to_string();
     *CLI_TOOL.write().unwrap() = cli_tool.to_string();
+    *DICTATION_SHORTCUT.write().unwrap() = dictation_shortcut.to_string();
 }
 
 /// Global Stream Deck manager state
@@ -45,6 +49,7 @@ pub struct DeckStatus {
 pub struct DeckSettings {
     pub terminal_app: String,
     pub cli_tool: String,
+    pub dictation_shortcut: String,
 }
 
 impl Default for DeckSettings {
@@ -52,6 +57,7 @@ impl Default for DeckSettings {
         DeckSettings {
             terminal_app: "Terminal".to_string(),
             cli_tool: "claude".to_string(),
+            dictation_shortcut: "fn_twice".to_string(),
         }
     }
 }
@@ -218,6 +224,7 @@ pub fn deck_execute_action(
     let action_settings = ActionSettings {
         terminal_app: settings.terminal_app,
         cli_tool: settings.cli_tool,
+        dictation_shortcut: settings.dictation_shortcut,
     };
 
     execute_action(&action, &action_settings)
@@ -250,8 +257,8 @@ pub fn deck_update_buttons(state: State<'_, DeckState>) -> Result<(), String> {
 #[tauri::command]
 #[specta::specta]
 pub fn deck_set_action_settings(settings: DeckSettings) {
-    set_action_settings(&settings.terminal_app, &settings.cli_tool);
-    info!("Set action settings: terminal={}, cli={}", settings.terminal_app, settings.cli_tool);
+    set_action_settings(&settings.terminal_app, &settings.cli_tool, &settings.dictation_shortcut);
+    info!("Set action settings: terminal={}, cli={}, dictation={}", settings.terminal_app, settings.cli_tool, settings.dictation_shortcut);
 }
 
 /// Update Stream Deck button images with custom settings
@@ -262,7 +269,7 @@ pub async fn deck_update_buttons_with_settings(
     settings: DeckSettings,
 ) -> Result<(), String> {
     // Update global action settings for button monitoring
-    set_action_settings(&settings.terminal_app, &settings.cli_tool);
+    set_action_settings(&settings.terminal_app, &settings.cli_tool, &settings.dictation_shortcut);
 
     // Get the deck Arc
     let deck_arc = {

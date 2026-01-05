@@ -7,6 +7,8 @@ interface DeckSettings {
   customTerminalApp: string
   cliTool: 'claude' | 'codex' | 'custom'
   customCliTool: string
+  dictationShortcut: 'fn_twice' | 'fn_hold' | 'ctrl_twice' | 'custom'
+  customDictationShortcut: string
   launchOnStartup: boolean
 }
 
@@ -33,6 +35,8 @@ const defaultSettings: DeckSettings = {
   customTerminalApp: '',
   cliTool: 'claude',
   customCliTool: '',
+  dictationShortcut: 'fn_twice',
+  customDictationShortcut: '',
   launchOnStartup: false,
 }
 
@@ -55,6 +59,15 @@ function parseCliTool(saved: string | null | undefined): DeckSettings['cliTool']
   return 'custom'
 }
 
+function parseDictationShortcut(saved: string | null | undefined): DeckSettings['dictationShortcut'] {
+  if (!saved) return 'fn_twice'
+  const lower = saved.toLowerCase()
+  if (lower === 'fn_twice' || lower === 'fn_hold' || lower === 'ctrl_twice') {
+    return lower as DeckSettings['dictationShortcut']
+  }
+  return 'custom'
+}
+
 // Convert frontend settings to Tauri command format
 function toTauriSettings(settings: DeckSettings): TauriDeckSettings {
   const terminalApp = settings.terminalApp === 'custom'
@@ -63,10 +76,14 @@ function toTauriSettings(settings: DeckSettings): TauriDeckSettings {
   const cliTool = settings.cliTool === 'custom'
     ? settings.customCliTool
     : settings.cliTool
+  const dictationShortcut = settings.dictationShortcut === 'custom'
+    ? settings.customDictationShortcut
+    : settings.dictationShortcut
 
   return {
     terminal_app: terminalApp || 'Terminal',
     cli_tool: cliTool || 'claude',
+    dictation_shortcut: dictationShortcut || 'fn_twice',
   }
 }
 
@@ -111,12 +128,15 @@ export const useDeckStore = create<DeckState>((set, get) => ({
       console.log('[loadSettings] Loaded prefs:', prefs)
       const terminalApp = parseTerminalApp(prefs.terminal_app)
       const cliTool = parseCliTool(prefs.cli_tool)
+      const dictationShortcut = parseDictationShortcut(prefs.dictation_shortcut)
 
       const loadedSettings: DeckSettings = {
         terminalApp,
         customTerminalApp: terminalApp === 'custom' ? (prefs.terminal_app || '') : '',
         cliTool,
         customCliTool: cliTool === 'custom' ? (prefs.cli_tool || '') : '',
+        dictationShortcut,
+        customDictationShortcut: dictationShortcut === 'custom' ? (prefs.dictation_shortcut || '') : '',
         launchOnStartup: false,
       }
 
@@ -148,11 +168,12 @@ export const useDeckStore = create<DeckState>((set, get) => ({
       }
       const prefs = prefsResult.data
       const tauriSettings = toTauriSettings(updatedSettings)
-      console.log('[updateSettings] Saving preferences:', { terminal_app: tauriSettings.terminal_app, cli_tool: tauriSettings.cli_tool })
+      console.log('[updateSettings] Saving preferences:', { terminal_app: tauriSettings.terminal_app, cli_tool: tauriSettings.cli_tool, dictation_shortcut: tauriSettings.dictation_shortcut })
       const saveResult = await commands.savePreferences({
         ...prefs,
         terminal_app: tauriSettings.terminal_app,
         cli_tool: tauriSettings.cli_tool,
+        dictation_shortcut: tauriSettings.dictation_shortcut,
       })
       if (saveResult.status === 'error') {
         console.error('[updateSettings] Failed to save:', saveResult.error)

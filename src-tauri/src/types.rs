@@ -39,16 +39,20 @@ pub struct AppPreferences {
     /// CLI tool preference (e.g., "claude", "codex")
     #[serde(default)]
     pub cli_tool: Option<String>,
+    /// Dictation shortcut (e.g., "fn_twice", "fn_hold", "ctrl_twice", or custom like "cmd+shift+d")
+    #[serde(default)]
+    pub dictation_shortcut: Option<String>,
 }
 
 impl Default for AppPreferences {
     fn default() -> Self {
         Self {
             theme: "system".to_string(),
-            quick_pane_shortcut: None, // None means use default
-            language: None,            // None means use system locale
-            terminal_app: None,        // None means use "terminal"
-            cli_tool: None,            // None means use "claude"
+            quick_pane_shortcut: None,  // None means use default
+            language: None,             // None means use system locale
+            terminal_app: None,         // None means use "terminal"
+            cli_tool: None,             // None means use "claude"
+            dictation_shortcut: None,   // None means use "fn_twice"
         }
     }
 }
