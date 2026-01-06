@@ -15,18 +15,12 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
-  publish-tauri:
+  build-macos:
     permissions:
       contents: write
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          # Universal macOS build (Apple Silicon + Intel)
-          - platform: 'macos-latest'
-            args: '--target universal-apple-darwin --bundles app,dmg'
+    runs-on: macos-latest
+    timeout-minutes: 60
 
-    runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
 
@@ -49,40 +43,203 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
-      - name: Build and release
-        uses: tauri-apps/tauri-action@dev
+      - name: Import code signing certificate
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          # Create temporary keychain
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+
+          # Import certificate
+          echo "$APPLE_CERTIFICATE" | base64 --decode > $RUNNER_TEMP/certificate.p12
+          security import $RUNNER_TEMP/certificate.p12 -P "$APPLE_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security list-keychain -d user -s $KEYCHAIN_PATH
+
+          # Verify certificate
+          security find-identity -v -p codesigning $KEYCHAIN_PATH
+
+      - name: Build Tauri app (without notarization)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          # macOS code signing and notarization
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          # macOS notarization
+        run: |
+          npm run tauri build -- --target universal-apple-darwin --bundles app,dmg
+
+      - name: Notarize app
+        timeout-minutes: 30
+        env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        with:
-          tagName: ${{ github.ref_name || inputs.version }}
-          releaseName: 'TerminalDeck ${{ github.ref_name || inputs.version }}'
-          releaseBody: |
-            ## TerminalDeck ${{ github.ref_name || inputs.version }}
+        run: |
+          APP_PATH="src-tauri/target/universal-apple-darwin/release/bundle/macos/TerminalDeck.app"
+          DMG_PATH="src-tauri/target/universal-apple-darwin/release/bundle/dmg/TerminalDeck_0.1.0_universal.dmg"
 
-            Control Claude Code with your Stream Deck MK.2 and voice dictation.
+          # Create ZIP for notarization
+          cd src-tauri/target/universal-apple-darwin/release/bundle/macos
+          zip -r TerminalDeck.zip TerminalDeck.app
+          cd -
 
-            ### Requirements
-            - macOS 12.0 (Monterey) or later
-            - Elgato Stream Deck MK.2
+          # Submit for notarization with 15 minute timeout
+          echo "Submitting app for notarization..."
+          xcrun notarytool submit \
+            "src-tauri/target/universal-apple-darwin/release/bundle/macos/TerminalDeck.zip" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait \
+            --timeout 15m \
+            --output-format json > notarization_result.json || true
 
-            ### Installation
-            Download the `.dmg` file and drag TerminalDeck to your Applications folder.
+          cat notarization_result.json
 
-            ### Auto-Updates
-            Existing users will receive automatic update notifications.
+          # Check if notarization succeeded
+          STATUS=$(jq -r '.status' notarization_result.json)
+          if [ "$STATUS" != "Accepted" ]; then
+            echo "Notarization failed with status: $STATUS"
+            # Get the log for debugging
+            SUBMISSION_ID=$(jq -r '.id' notarization_result.json)
+            if [ "$SUBMISSION_ID" != "null" ]; then
+              xcrun notarytool log "$SUBMISSION_ID" \
+                --apple-id "$APPLE_ID" \
+                --password "$APPLE_PASSWORD" \
+                --team-id "$APPLE_TEAM_ID" || true
+            fi
+            exit 1
+          fi
 
-            **Full Changelog**: https://github.com/${{ github.repository }}/commits/${{ github.ref_name || inputs.version }}
-          releaseDraft: true
-          prerelease: false
-          includeUpdaterJson: true
-          args: ${{ matrix.args }}
+          echo "Notarization successful!"
+
+      - name: Staple notarization ticket
+        run: |
+          APP_PATH="src-tauri/target/universal-apple-darwin/release/bundle/macos/TerminalDeck.app"
+          DMG_PATH="src-tauri/target/universal-apple-darwin/release/bundle/dmg/TerminalDeck_0.1.0_universal.dmg"
+
+          # Staple the app
+          xcrun stapler staple "$APP_PATH"
+
+          # Recreate DMG with stapled app
+          rm -f "$DMG_PATH"
+          hdiutil create -volname "TerminalDeck" -srcfolder "$APP_PATH" -ov -format UDZO "$DMG_PATH"
+
+          # Notarize the DMG too
+          echo "Submitting DMG for notarization..."
+          xcrun notarytool submit "$DMG_PATH" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait \
+            --timeout 15m || true
+
+          # Staple the DMG
+          xcrun stapler staple "$DMG_PATH"
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      - name: Sign updater artifacts
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          # Create tar.gz of the app for updater
+          cd src-tauri/target/universal-apple-darwin/release/bundle/macos
+          tar -czf TerminalDeck.app.tar.gz TerminalDeck.app
+
+          # Sign the tar.gz for updater
+          echo "$TAURI_SIGNING_PRIVATE_KEY" > /tmp/private_key.txt
+          npx @tauri-apps/cli signer sign \
+            -k /tmp/private_key.txt \
+            -p "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" \
+            TerminalDeck.app.tar.gz
+          rm /tmp/private_key.txt
+
+      - name: Create GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ github.ref_name || inputs.version }}"
+          DMG_PATH="src-tauri/target/universal-apple-darwin/release/bundle/dmg/TerminalDeck_0.1.0_universal.dmg"
+          APP_TAR_PATH="src-tauri/target/universal-apple-darwin/release/bundle/macos/TerminalDeck.app.tar.gz"
+          APP_SIG_PATH="src-tauri/target/universal-apple-darwin/release/bundle/macos/TerminalDeck.app.tar.gz.sig"
+
+          # Rename DMG with version
+          VERSIONED_DMG="TerminalDeck_${VERSION}_universal.dmg"
+          cp "$DMG_PATH" "$VERSIONED_DMG"
+
+          # Create release body
+          cat > release_body.md << 'EOF'
+          ## TerminalDeck ${{ github.ref_name || inputs.version }}
+
+          Control Claude Code with your Stream Deck MK.2 and voice dictation.
+
+          ### Requirements
+          - macOS 12.0 (Monterey) or later
+          - Elgato Stream Deck MK.2
+
+          ### Installation
+          Download the `.dmg` file and drag TerminalDeck to your Applications folder.
+
+          ### Auto-Updates
+          Existing users will receive automatic update notifications.
+
+          **Full Changelog**: https://github.com/${{ github.repository }}/commits/${{ github.ref_name || inputs.version }}
+          EOF
+
+          # Create or update release
+          gh release create "$VERSION" \
+            --title "TerminalDeck $VERSION" \
+            --notes-file release_body.md \
+            --draft \
+            "$VERSIONED_DMG" \
+            "$APP_TAR_PATH" \
+            "$APP_SIG_PATH" || \
+          gh release upload "$VERSION" \
+            "$VERSIONED_DMG" \
+            "$APP_TAR_PATH" \
+            "$APP_SIG_PATH" --clobber
+
+      - name: Generate updater JSON
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ github.ref_name || inputs.version }}"
+          SIG_PATH="src-tauri/target/universal-apple-darwin/release/bundle/macos/TerminalDeck.app.tar.gz.sig"
+
+          # Read signature
+          SIGNATURE=$(cat "$SIG_PATH")
+
+          # Get current date
+          PUB_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+          # Create updater JSON
+          cat > latest.json << EOF
+          {
+            "version": "$VERSION",
+            "notes": "See the release notes on GitHub",
+            "pub_date": "$PUB_DATE",
+            "platforms": {
+              "darwin-aarch64": {
+                "signature": "$SIGNATURE",
+                "url": "https://github.com/${{ github.repository }}/releases/download/$VERSION/TerminalDeck.app.tar.gz"
+              },
+              "darwin-x86_64": {
+                "signature": "$SIGNATURE",
+                "url": "https://github.com/${{ github.repository }}/releases/download/$VERSION/TerminalDeck.app.tar.gz"
+              }
+            }
+          }
+          EOF
+
+          # Upload updater JSON
+          gh release upload "$VERSION" latest.json --clobber
