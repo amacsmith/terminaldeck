@@ -1,21 +1,26 @@
 use tauri_specta::{collect_commands, Builder};
 
 pub fn generate_bindings() -> Builder<tauri::Wry> {
-    use crate::commands::{notifications, preferences, quick_pane, recovery, streamdeck};
+    use crate::commands::{claude, notifications, preferences, quick_pane, recovery, streamdeck};
 
     Builder::<tauri::Wry>::new().commands(collect_commands![
+        // Preferences
         preferences::greet,
         preferences::load_preferences,
         preferences::save_preferences,
+        // Notifications
         notifications::send_native_notification,
+        // Recovery
         recovery::save_emergency_data,
         recovery::load_emergency_data,
         recovery::cleanup_old_recovery_files,
+        // Quick Pane
         quick_pane::show_quick_pane,
         quick_pane::dismiss_quick_pane,
         quick_pane::toggle_quick_pane,
         quick_pane::get_default_quick_pane_shortcut,
         quick_pane::update_quick_pane_shortcut,
+        // Stream Deck
         streamdeck::deck_status,
         streamdeck::deck_connect,
         streamdeck::deck_disconnect,
@@ -27,6 +32,30 @@ pub fn generate_bindings() -> Builder<tauri::Wry> {
         streamdeck::deck_update_buttons_with_settings,
         streamdeck::deck_set_action_settings,
         streamdeck::deck_debug_save_image,
+        // Claude Code Integration
+        claude::claude_get_state,
+        claude::claude_is_running,
+        claude::claude_speak,
+        claude::claude_speak_summary,
+        claude::claude_toggle_tts,
+        claude::claude_get_tts_settings,
+        claude::claude_set_tts_settings,
+        claude::claude_activate_stt,
+        claude::claude_deactivate_stt,
+        claude::claude_toggle_stt,
+        claude::claude_start_session,
+        claude::claude_get_session,
+        claude::claude_set_phase,
+        claude::claude_add_task,
+        claude::claude_update_task,
+        claude::claude_set_next_steps,
+        claude::claude_get_logs,
+        claude::claude_process_output,
+        claude::claude_execute_action,
+        claude::claude_respond_number,
+        claude::claude_next_terminal,
+        claude::claude_terminal_tab,
+        claude::claude_project_command,
     ])
 }
 

@@ -5,6 +5,7 @@
 //! and shared types are in the `types` module.
 
 mod bindings;
+mod claude;
 mod commands;
 mod streamdeck;
 mod types;
@@ -107,6 +108,15 @@ pub fn run() {
         .plugin(tauri_plugin_os::init())
         .manage(commands::streamdeck::DeckState(std::sync::Mutex::new(
             streamdeck::StreamDeckManager::new(),
+        )))
+        .manage(commands::claude::ClaudeState(std::sync::Mutex::new(
+            claude::ClaudeCodeManager::new(),
+        )))
+        .manage(commands::claude::MonitorState(std::sync::Mutex::new(
+            claude::ProgressMonitor::new(),
+        )))
+        .manage(commands::claude::TtsState(std::sync::Mutex::new(
+            commands::claude::TtsSettings::default(),
         )))
         .setup(|app| {
             log::info!("Application starting up");
