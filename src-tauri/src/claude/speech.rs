@@ -7,6 +7,53 @@ use std::sync::atomic::{AtomicBool, Ordering};
 static TTS_ENABLED: AtomicBool = AtomicBool::new(true);
 static STT_ACTIVE: AtomicBool = AtomicBool::new(false);
 
+// ============================================================================
+// Security: Voice Whitelist
+// ============================================================================
+
+/// Known safe macOS voice names (prevents voice parameter injection)
+const ALLOWED_VOICES: &[&str] = &[
+    // English voices
+    "Alex", "Daniel", "Fiona", "Fred", "Karen", "Moira", "Rishi", "Samantha",
+    "Tessa", "Veena", "Victoria", "Zoe",
+    // Premium voices
+    "Allison", "Ava", "Evan", "Joelle", "Nathan", "Nicky", "Tom", "Zarvox",
+    // Additional system voices
+    "Agnes", "Albert", "Bad News", "Bahh", "Bells", "Boing", "Bruce", "Bubbles",
+    "Cellos", "Deranged", "Good News", "Hysterical", "Junior", "Kathy",
+    "Organ", "Princess", "Ralph", "Trinoids", "Vicki", "Whisper",
+];
+
+/// Validate voice name against whitelist
+fn validate_voice(voice: &str) -> &str {
+    if ALLOWED_VOICES.iter().any(|v| v.eq_ignore_ascii_case(voice)) {
+        voice
+    } else {
+        info!("Invalid voice '{}', falling back to Samantha", voice);
+        "Samantha"
+    }
+}
+
+/// Sanitize text for shell execution (prevents command injection)
+fn sanitize_text_for_shell(text: &str) -> String {
+    text.chars()
+        .filter_map(|c| match c {
+            // Allow alphanumeric and safe punctuation
+            'a'..='z' | 'A'..='Z' | '0'..='9' => Some(c),
+            ' ' | '.' | ',' | '!' | '?' | ':' | ';' | '-' | '\'' => Some(c),
+            // Convert newlines/tabs to spaces
+            '\n' | '\r' | '\t' => Some(' '),
+            // Drop dangerous characters entirely: " ` $ ( ) | & < > \ { } [ ]
+            '"' | '`' | '$' | '(' | ')' | '|' | '&' | '<' | '>' | '\\' | '{' | '}' | '[' | ']' => None,
+            // Convert other characters to space
+            _ => Some(' '),
+        })
+        .collect::<String>()
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
 /// Text-to-Speech configuration
 pub struct TextToSpeech {
     /// Voice to use (macOS voices: Alex, Samantha, etc.)
@@ -35,15 +82,20 @@ impl TextToSpeech {
             return Ok(());
         }
 
-        // Sanitize text for shell
-        let clean_text = text
-            .replace('"', r#"\""#)
-            .replace('`', "'")
-            .replace('\n', " ");
+        // Security: Validate voice against whitelist (prevents voice injection)
+        let safe_voice = validate_voice(&self.voice);
+
+        // Security: Sanitize text (prevents command injection via shell metacharacters)
+        let clean_text = sanitize_text_for_shell(text);
+
+        if clean_text.is_empty() {
+            debug!("Text became empty after sanitization, skipping TTS");
+            return Ok(());
+        }
 
         let output = Command::new("say")
             .arg("-v")
-            .arg(&self.voice)
+            .arg(safe_voice)
             .arg("-r")
             .arg(self.rate.to_string())
             .arg(&clean_text)

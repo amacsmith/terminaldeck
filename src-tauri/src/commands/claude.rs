@@ -40,17 +40,17 @@ pub struct TtsSettings {
 /// Get current Claude Code state
 #[tauri::command]
 #[specta::specta]
-pub fn claude_get_state(state: State<'_, ClaudeState>) -> crate::claude::cli::ClaudeState {
-    let manager = state.0.lock().unwrap();
-    manager.get_state()
+pub fn claude_get_state(state: State<'_, ClaudeState>) -> Result<crate::claude::cli::ClaudeState, String> {
+    let manager = state.0.lock().map_err(|_| "Failed to acquire state lock")?;
+    Ok(manager.get_state())
 }
 
 /// Check if Claude Code is running
 #[tauri::command]
 #[specta::specta]
-pub fn claude_is_running(state: State<'_, ClaudeState>) -> bool {
-    let manager = state.0.lock().unwrap();
-    manager.is_running()
+pub fn claude_is_running(state: State<'_, ClaudeState>) -> Result<bool, String> {
+    let manager = state.0.lock().map_err(|_| "Failed to acquire state lock")?;
+    Ok(manager.is_running())
 }
 
 // ============================================================================
@@ -102,28 +102,30 @@ pub fn claude_speak_summary(
 /// Toggle TTS enabled state
 #[tauri::command]
 #[specta::specta]
-pub fn claude_toggle_tts(tts_state: State<'_, TtsState>) -> bool {
-    let mut settings = tts_state.0.lock().unwrap();
+pub fn claude_toggle_tts(tts_state: State<'_, TtsState>) -> Result<bool, String> {
+    let mut settings = tts_state.0.lock().map_err(|_| "Failed to acquire TTS lock")?;
     settings.enabled = !settings.enabled;
     TextToSpeech::set_enabled(settings.enabled);
     info!("TTS toggled: {}", settings.enabled);
-    settings.enabled
+    Ok(settings.enabled)
 }
 
 /// Get TTS settings
 #[tauri::command]
 #[specta::specta]
-pub fn claude_get_tts_settings(tts_state: State<'_, TtsState>) -> TtsSettings {
-    tts_state.0.lock().unwrap().clone()
+pub fn claude_get_tts_settings(tts_state: State<'_, TtsState>) -> Result<TtsSettings, String> {
+    let settings = tts_state.0.lock().map_err(|_| "Failed to acquire TTS lock")?;
+    Ok(settings.clone())
 }
 
 /// Set TTS settings
 #[tauri::command]
 #[specta::specta]
-pub fn claude_set_tts_settings(settings: TtsSettings, tts_state: State<'_, TtsState>) {
-    let mut state = tts_state.0.lock().unwrap();
+pub fn claude_set_tts_settings(settings: TtsSettings, tts_state: State<'_, TtsState>) -> Result<(), String> {
+    let mut state = tts_state.0.lock().map_err(|_| "Failed to acquire TTS lock")?;
     *state = settings;
     TextToSpeech::set_enabled(state.enabled);
+    Ok(())
 }
 
 /// Activate speech-to-text
@@ -165,40 +167,42 @@ pub fn claude_toggle_stt() -> Result<bool, String> {
 /// Start a new monitoring session
 #[tauri::command]
 #[specta::specta]
-pub fn claude_start_session(name: Option<String>, monitor_state: State<'_, MonitorState>) {
-    let mut monitor = monitor_state.0.lock().unwrap();
+pub fn claude_start_session(name: Option<String>, monitor_state: State<'_, MonitorState>) -> Result<(), String> {
+    let mut monitor = monitor_state.0.lock().map_err(|_| "Failed to acquire monitor lock")?;
     monitor.start_session(name);
+    Ok(())
 }
 
 /// Get current session info
 #[tauri::command]
 #[specta::specta]
-pub fn claude_get_session(monitor_state: State<'_, MonitorState>) -> SessionInfo {
-    let monitor = monitor_state.0.lock().unwrap();
-    monitor.get_session()
+pub fn claude_get_session(monitor_state: State<'_, MonitorState>) -> Result<SessionInfo, String> {
+    let monitor = monitor_state.0.lock().map_err(|_| "Failed to acquire monitor lock")?;
+    Ok(monitor.get_session())
 }
 
 /// Set session phase
 #[tauri::command]
 #[specta::specta]
-pub fn claude_set_phase(phase: String, monitor_state: State<'_, MonitorState>) {
-    let monitor = monitor_state.0.lock().unwrap();
+pub fn claude_set_phase(phase: String, monitor_state: State<'_, MonitorState>) -> Result<(), String> {
+    let monitor = monitor_state.0.lock().map_err(|_| "Failed to acquire monitor lock")?;
     monitor.set_phase(SessionPhase::from_str(&phase));
+    Ok(())
 }
 
 /// Add a task to monitor
 #[tauri::command]
 #[specta::specta]
-pub fn claude_add_task(description: String, monitor_state: State<'_, MonitorState>) -> u32 {
-    let monitor = monitor_state.0.lock().unwrap();
-    monitor.add_task(description)
+pub fn claude_add_task(description: String, monitor_state: State<'_, MonitorState>) -> Result<u32, String> {
+    let monitor = monitor_state.0.lock().map_err(|_| "Failed to acquire monitor lock")?;
+    Ok(monitor.add_task(description))
 }
 
 /// Update task status
 #[tauri::command]
 #[specta::specta]
-pub fn claude_update_task(task_id: u32, status: String, monitor_state: State<'_, MonitorState>) {
-    let monitor = monitor_state.0.lock().unwrap();
+pub fn claude_update_task(task_id: u32, status: String, monitor_state: State<'_, MonitorState>) -> Result<(), String> {
+    let monitor = monitor_state.0.lock().map_err(|_| "Failed to acquire monitor lock")?;
     let state = match status.as_str() {
         "pending" => TaskState::Pending,
         "in_progress" => TaskState::InProgress,
@@ -208,30 +212,33 @@ pub fn claude_update_task(task_id: u32, status: String, monitor_state: State<'_,
         _ => TaskState::Pending,
     };
     monitor.update_task(task_id, state);
+    Ok(())
 }
 
 /// Set next steps
 #[tauri::command]
 #[specta::specta]
-pub fn claude_set_next_steps(steps: Vec<String>, monitor_state: State<'_, MonitorState>) {
-    let monitor = monitor_state.0.lock().unwrap();
+pub fn claude_set_next_steps(steps: Vec<String>, monitor_state: State<'_, MonitorState>) -> Result<(), String> {
+    let monitor = monitor_state.0.lock().map_err(|_| "Failed to acquire monitor lock")?;
     monitor.set_next_steps(steps);
+    Ok(())
 }
 
 /// Get recent logs
 #[tauri::command]
 #[specta::specta]
-pub fn claude_get_logs(limit: usize, monitor_state: State<'_, MonitorState>) -> Vec<LogEntry> {
-    let monitor = monitor_state.0.lock().unwrap();
-    monitor.get_logs(limit)
+pub fn claude_get_logs(limit: usize, monitor_state: State<'_, MonitorState>) -> Result<Vec<LogEntry>, String> {
+    let monitor = monitor_state.0.lock().map_err(|_| "Failed to acquire monitor lock")?;
+    Ok(monitor.get_logs(limit))
 }
 
 /// Process output line (for parsing Claude Code output)
 #[tauri::command]
 #[specta::specta]
-pub fn claude_process_output(line: String, monitor_state: State<'_, MonitorState>) {
-    let monitor = monitor_state.0.lock().unwrap();
+pub fn claude_process_output(line: String, monitor_state: State<'_, MonitorState>) -> Result<(), String> {
+    let monitor = monitor_state.0.lock().map_err(|_| "Failed to acquire monitor lock")?;
     monitor.process_output(&line);
+    Ok(())
 }
 
 // ============================================================================
@@ -370,20 +377,30 @@ pub fn claude_terminal_tab(tab_number: u8, terminal_app: String) -> Result<(), S
 // Project Commands
 // ============================================================================
 
+/// Allowed project commands (whitelist for security - prevents command injection)
+const ALLOWED_PROJECT_COMMANDS: &[(&str, &str)] = &[
+    ("build", "/build"),
+    ("test", "/test"),
+    ("commit", "/commit"),
+    ("pr", "/pr"),
+    ("help", "/help"),
+    ("review", "/review"),
+    ("lint", "/lint"),
+    ("run", "run the project"),
+];
+
 /// Send a project command to Claude Code
 #[tauri::command]
 #[specta::specta]
 pub fn claude_project_command(command: String) -> Result<(), String> {
     use std::process::Command as SysCommand;
 
-    let cmd = match command.as_str() {
-        "build" => "/build",
-        "test" => "/test",
-        "commit" => "/commit",
-        "pr" => "/pr",
-        "help" => "/help",
-        _ => &command,
-    };
+    // Security: Only allow whitelisted commands (prevents AppleScript injection)
+    let cmd = ALLOWED_PROJECT_COMMANDS
+        .iter()
+        .find(|(key, _)| *key == command.as_str())
+        .map(|(_, val)| *val)
+        .ok_or_else(|| format!("Unknown project command: {command}"))?;
 
     let script = format!(
         r#"tell application "System Events"

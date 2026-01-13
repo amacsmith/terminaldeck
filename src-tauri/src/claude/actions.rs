@@ -175,15 +175,25 @@ fn switch_to_terminal_number(number: u8, terminal_app: &str) -> Result<(), Strin
 // Project Commands
 // ============================================================================
 
+/// Allowed project commands (whitelist for security)
+const ALLOWED_PROJECT_COMMANDS: &[(&str, &str)] = &[
+    ("build", "/build"),
+    ("test", "/test"),
+    ("run", "run the project"),
+    ("commit", "/commit"),
+    ("pr", "/pr"),
+    ("help", "/help"),
+    ("review", "/review"),
+    ("lint", "/lint"),
+];
+
 fn send_project_command(command: &str) -> Result<(), String> {
-    // Type the command to Claude Code
-    let cmd = match command {
-        "build" => "/build",
-        "test" => "/test",
-        "run" => "run the project",
-        "commit" => "/commit",
-        _ => command,
-    };
+    // Security: Only allow whitelisted commands (prevents command injection)
+    let cmd = ALLOWED_PROJECT_COMMANDS
+        .iter()
+        .find(|(key, _)| *key == command)
+        .map(|(_, val)| *val)
+        .ok_or_else(|| format!("Unknown project command: {command}"))?;
 
     // Type command and submit
     let script = format!(

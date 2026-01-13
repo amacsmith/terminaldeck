@@ -20,20 +20,28 @@ static CLI_TOOL: std::sync::RwLock<String> = std::sync::RwLock::new(String::new(
 static DICTATION_SHORTCUT: std::sync::RwLock<String> = std::sync::RwLock::new(String::new());
 
 fn get_action_settings() -> ActionSettings {
-    let terminal = TERMINAL_APP.read().unwrap();
-    let cli = CLI_TOOL.read().unwrap();
-    let dictation = DICTATION_SHORTCUT.read().unwrap();
+    // Use unwrap_or_default to safely handle poisoned locks
+    let terminal = TERMINAL_APP.read().ok().map(|t| t.clone()).unwrap_or_default();
+    let cli = CLI_TOOL.read().ok().map(|c| c.clone()).unwrap_or_default();
+    let dictation = DICTATION_SHORTCUT.read().ok().map(|d| d.clone()).unwrap_or_default();
     ActionSettings {
-        terminal_app: if terminal.is_empty() { "Terminal".to_string() } else { terminal.clone() },
-        cli_tool: if cli.is_empty() { "claude".to_string() } else { cli.clone() },
-        dictation_shortcut: if dictation.is_empty() { "ctrl_twice".to_string() } else { dictation.clone() },
+        terminal_app: if terminal.is_empty() { "Terminal".to_string() } else { terminal },
+        cli_tool: if cli.is_empty() { "claude".to_string() } else { cli },
+        dictation_shortcut: if dictation.is_empty() { "ctrl_twice".to_string() } else { dictation },
     }
 }
 
 fn set_action_settings(terminal_app: &str, cli_tool: &str, dictation_shortcut: &str) {
-    *TERMINAL_APP.write().unwrap() = terminal_app.to_string();
-    *CLI_TOOL.write().unwrap() = cli_tool.to_string();
-    *DICTATION_SHORTCUT.write().unwrap() = dictation_shortcut.to_string();
+    // Safely handle poisoned locks by ignoring failures
+    if let Ok(mut t) = TERMINAL_APP.write() {
+        *t = terminal_app.to_string();
+    }
+    if let Ok(mut c) = CLI_TOOL.write() {
+        *c = cli_tool.to_string();
+    }
+    if let Ok(mut d) = DICTATION_SHORTCUT.write() {
+        *d = dictation_shortcut.to_string();
+    }
 }
 
 /// Global Stream Deck manager state
@@ -65,8 +73,8 @@ impl Default for DeckSettings {
 /// Check Stream Deck connection status
 #[tauri::command]
 #[specta::specta]
-pub fn deck_status(state: State<'_, DeckState>) -> DeckStatus {
-    let manager = state.0.lock().unwrap();
+pub fn deck_status(state: State<'_, DeckState>) -> Result<DeckStatus, String> {
+    let manager = state.0.lock().map_err(|_| "Failed to acquire deck lock")?;
     let is_connected = manager.is_connected();
 
     // If was connected but now disconnected, stop monitoring
@@ -75,10 +83,10 @@ pub fn deck_status(state: State<'_, DeckState>) -> DeckStatus {
         debug!("Stream Deck disconnected - stopped monitoring");
     }
 
-    DeckStatus {
+    Ok(DeckStatus {
         connected: is_connected,
         buttons: get_default_buttons(),
-    }
+    })
 }
 
 /// Connect to Stream Deck
